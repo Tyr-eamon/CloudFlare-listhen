@@ -4,10 +4,12 @@
  * This endpoint handles incoming webhook updates from Telegram bots to automatically
  * capture files uploaded to private channels.
  * 
- * Required Environment Variables:
+ * Required Environment Variables or Configuration:
  * - TELEGRAM_WEBHOOK_SECRET: Secret token for webhook validation
  * - TELEGRAM_LISTENER_BOT_TOKEN: Bot token for the listener bot (used for file downloads)
  * - TELEGRAM_LISTENER_CHAT_ID: Chat ID of the channel to monitor
+ * 
+ * Can be overridden by configuration in KV: manage@sysConfig@webhookConfig
  * 
  * Endpoint: POST /webhook/telegram
  * 
@@ -32,17 +34,69 @@ export async function onRequest(context) {
     }
 
     try {
+        const db = getDatabase(env);
+        
+        // 从 KV 配置中读取 Webhook Secret、监听的频道 ID 和 Bot Token
+        let webhookSecret = env.TELEGRAM_WEBHOOK_SECRET;
+        let listenerChatId = env.TELEGRAM_LISTENER_CHAT_ID;
+        let botToken = env.TELEGRAM_LISTENER_BOT_TOKEN;
+        
+        try {
+            const configStr = await db.get('manage@sysConfig@webhookConfig');
+            if (configStr) {
+                const config = JSON.parse(configStr);
+                if (config.webhookSecret) {
+                    webhookSecret = config.webhookSecret;
+                }
+                if (config.chatId) {
+                    listenerChatId = config.chatId;
+                }
+                if (config.botToken) {
+                    botToken = config.botToken;
+                }
+                if (!config.enabled) {
+                    console.log('Webhook is disabled in configuration');
+                    return createResponse(JSON.stringify({
+                        status: 200,
+                        message: 'Webhook disabled'
+                    }), {
+                        status: 200,
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                }
+            }
+        } catch (configError) {
+            console.error('Error reading webhook config from KV:', configError);
+        }
+        
         // 验证 webhook secret
-        const webhookSecret = env.TELEGRAM_WEBHOOK_SECRET;
         if (!webhookSecret) {
             console.error('TELEGRAM_WEBHOOK_SECRET not configured');
-            return createResponse('Webhook secret not configured', { status: 500 });
+            return createResponse(JSON.stringify({
+                status: 200,
+                message: 'Webhook secret not configured'
+            }), {
+                status: 200,
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
         }
 
         const secretToken = request.headers.get('X-Telegram-Bot-Api-Secret-Token');
         if (secretToken !== webhookSecret) {
-            console.error('Invalid webhook secret');
-            return createResponse('Unauthorized', { status: 403 });
+            console.error('Invalid webhook secret received:', secretToken);
+            return createResponse(JSON.stringify({
+                status: 200,
+                message: 'Invalid secret'
+            }), {
+                status: 200,
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
         }
 
         // 解析请求体
@@ -69,9 +123,8 @@ export async function onRequest(context) {
         const date = channelPost.date * 1000; // 转换为毫秒
 
         // 检查是否为监听的频道
-        const listenerChatId = env.TELEGRAM_LISTENER_CHAT_ID;
         if (!listenerChatId || chatId !== listenerChatId) {
-            console.log(`Chat ${chatId} not monitored, skipping`);
+            console.log(`Chat ${chatId} not monitored. Expected: ${listenerChatId}`);
             return createResponse(JSON.stringify({
                 status: 200,
                 message: 'Chat not monitored'
@@ -160,7 +213,7 @@ export async function onRequest(context) {
             FileSize: (fileInfo.file_size / 1024 / 1024).toFixed(2),
             TgFileId: fileInfo.file_id,
             TgChatId: chatId,
-            TgBotToken: env.TELEGRAM_LISTENER_BOT_TOKEN,
+            TgBotToken: botToken,
             Channel: "TelegramNew",
             Directory: "webhook_imported/",
             TimeStamp: date,
@@ -176,7 +229,6 @@ export async function onRequest(context) {
         };
 
         // 存储到数据库
-        const db = getDatabase(env);
         try {
             await db.put(fileId, "", {
                 metadata: metadata,

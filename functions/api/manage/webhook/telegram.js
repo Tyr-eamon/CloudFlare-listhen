@@ -14,8 +14,15 @@ export async function onRequest(context) {
     const db = getDatabase(env);
 
     try {
-        // GET - 获取 Webhook 状态
+        // 获取查询参数
+        const url = new URL(request.url);
+        const action = url.searchParams.get('action');
+        
+        // GET - 获取 Webhook 状态或测试连接
         if (request.method === 'GET') {
+            if (action === 'test') {
+                return await testWebhookConnection(db, env);
+            }
             return await getWebhookStatus(db, env);
         }
 
@@ -245,6 +252,110 @@ async function deleteWebhook(db, env) {
             error: error.message
         }), {
             status: 500,
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
+}
+
+async function testWebhookConnection(db, env) {
+    try {
+        const config = await getWebhookConfig(db, env);
+
+        if (!config.botToken) {
+            return new Response(JSON.stringify({
+                success: false,
+                error: 'Bot token not configured',
+                test: 'failed'
+            }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+
+        if (!config.chatId) {
+            return new Response(JSON.stringify({
+                success: false,
+                error: 'Chat ID not configured',
+                test: 'failed'
+            }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+
+        if (!config.webhookSecret) {
+            return new Response(JSON.stringify({
+                success: false,
+                error: 'Webhook Secret not configured',
+                test: 'failed'
+            }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+
+        // 测试 Bot Token 的有效性
+        const telegramAPI = new TelegramAPI(config.botToken);
+        const meResult = await telegramAPI.getMe();
+
+        if (!meResult.ok) {
+            return new Response(JSON.stringify({
+                success: false,
+                error: 'Invalid Bot Token: ' + meResult.description,
+                test: 'failed'
+            }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+
+        // 测试频道 ID 的有效性（尝试获取频道信息）
+        const chatResult = await telegramAPI.getChat(config.chatId);
+
+        if (!chatResult.ok) {
+            return new Response(JSON.stringify({
+                success: false,
+                error: 'Invalid Chat ID or Bot is not member: ' + chatResult.description,
+                test: 'failed',
+                botInfo: {
+                    id: meResult.result.id,
+                    username: meResult.result.username,
+                    firstName: meResult.result.first_name
+                }
+            }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+
+        return new Response(JSON.stringify({
+            success: true,
+            test: 'passed',
+            message: 'Webhook configuration is valid',
+            botInfo: {
+                id: meResult.result.id,
+                username: meResult.result.username,
+                firstName: meResult.result.first_name,
+                isBot: meResult.result.is_bot
+            },
+            chatInfo: {
+                id: chatResult.result.id,
+                title: chatResult.result.title || '',
+                type: chatResult.result.type
+            }
+        }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+    } catch (error) {
+        console.error('Test webhook connection error:', error);
+        return new Response(JSON.stringify({
+            success: false,
+            error: error.message,
+            test: 'failed'
+        }), {
+            status: 200,
             headers: { 'Content-Type': 'application/json' }
         });
     }

@@ -47,7 +47,9 @@ export async function onRequest(context) {
         // 写入数据库
         await db.put('manage@sysConfig@others', JSON.stringify(settings))
 
-        return new Response(JSON.stringify(settings), {
+        // 返回更新后的完整配置
+        const updatedSettings = await getOthersConfig(db, env)
+        return new Response(JSON.stringify(updatedSettings), {
             headers: {
                 'content-type': 'application/json',
             },

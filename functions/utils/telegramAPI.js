@@ -203,4 +203,37 @@ export class TelegramAPI {
         return responseData;
     }
 
+    /**
+     * 获取 Bot 自身信息
+     * @returns {Promise<Object>} Bot 信息
+     */
+    async getMe() {
+        const response = await fetch(`${this.baseURL}/getMe`, {
+            method: 'GET',
+            headers: this.defaultHeaders
+        });
+
+        const responseData = await response.json();
+        return responseData;
+    }
+
+    /**
+     * 获取频道信息
+     * @param {string} chatId - 频道 ID
+     * @returns {Promise<Object>} 频道信息
+     */
+    async getChat(chatId) {
+        const params = new URLSearchParams({
+            chat_id: chatId.toString()
+        });
+
+        const response = await fetch(`${this.baseURL}/getChat?${params.toString()}`, {
+            method: 'GET',
+            headers: this.defaultHeaders
+        });
+
+        const responseData = await response.json();
+        return responseData;
+    }
+
 }

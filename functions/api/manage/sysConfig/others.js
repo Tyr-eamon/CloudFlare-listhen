@@ -29,6 +29,21 @@ export async function onRequest(context) {
         const body = await request.json()
         const settings = body
 
+        // 如果包含 telegramWebhook 配置，单独保存
+        if (settings.telegramWebhook) {
+            const webhookConfig = {
+                enabled: settings.telegramWebhook.enabled ?? false,
+                botToken: settings.telegramWebhook.botToken || '',
+                chatId: settings.telegramWebhook.chatId || '',
+                webhookSecret: settings.telegramWebhook.webhookSecret || '',
+                lastUpdated: Date.now()
+            }
+            await db.put('manage@sysConfig@webhookConfig', JSON.stringify(webhookConfig))
+            
+            // 从 settings 中移除 telegramWebhook，避免重复保存
+            delete settings.telegramWebhook
+        }
+
         // 写入数据库
         await db.put('manage@sysConfig@others', JSON.stringify(settings))
 
@@ -80,6 +95,18 @@ export async function getOthersConfig(db, env) {
         fixed: false,
     }
 
+    // Telegram Webhook (从专用的 webhookConfig 读取)
+    const webhookConfigStr = await db.get('manage@sysConfig@webhookConfig')
+    const webhookConfig = webhookConfigStr ? JSON.parse(webhookConfigStr) : {}
+    
+    settings.telegramWebhook = {
+        enabled: webhookConfig.enabled ?? false,
+        botToken: webhookConfig.botToken || env.TELEGRAM_LISTENER_BOT_TOKEN || '',
+        chatId: webhookConfig.chatId || env.TELEGRAM_LISTENER_CHAT_ID || '',
+        webhookSecret: webhookConfig.webhookSecret || env.TELEGRAM_WEBHOOK_SECRET || '',
+        lastUpdated: webhookConfig.lastUpdated || null,
+        fixed: false,
+    }
 
     return settings;
 }

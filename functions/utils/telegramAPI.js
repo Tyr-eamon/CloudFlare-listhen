@@ -135,4 +135,72 @@ export class TelegramAPI {
         return response;
     }
 
+    /**
+     * 设置 Webhook
+     * @param {string} url - Webhook URL
+     * @param {Object} options - 可选参数
+     * @param {string} options.secret_token - 验证密钥
+     * @param {Array<string>} options.allowed_updates - 允许的更新类型
+     * @param {boolean} options.drop_pending_updates - 是否删除待处理的更新
+     * @returns {Promise<Object>} API响应结果
+     */
+    async setWebhook(url, options = {}) {
+        const params = new URLSearchParams({
+            url: url
+        });
+
+        if (options.secret_token) {
+            params.append('secret_token', options.secret_token);
+        }
+
+        if (options.allowed_updates && Array.isArray(options.allowed_updates)) {
+            params.append('allowed_updates', JSON.stringify(options.allowed_updates));
+        }
+
+        if (options.drop_pending_updates !== undefined) {
+            params.append('drop_pending_updates', options.drop_pending_updates.toString());
+        }
+
+        const response = await fetch(`${this.baseURL}/setWebhook?${params.toString()}`, {
+            method: 'POST',
+            headers: this.defaultHeaders
+        });
+
+        const responseData = await response.json();
+        return responseData;
+    }
+
+    /**
+     * 获取 Webhook 信息
+     * @returns {Promise<Object>} Webhook信息
+     */
+    async getWebhookInfo() {
+        const response = await fetch(`${this.baseURL}/getWebhookInfo`, {
+            method: 'GET',
+            headers: this.defaultHeaders
+        });
+
+        const responseData = await response.json();
+        return responseData;
+    }
+
+    /**
+     * 删除 Webhook
+     * @param {boolean} dropPendingUpdates - 是否删除待处理的更新
+     * @returns {Promise<Object>} API响应结果
+     */
+    async deleteWebhook(dropPendingUpdates = false) {
+        const params = new URLSearchParams({
+            drop_pending_updates: dropPendingUpdates.toString()
+        });
+
+        const response = await fetch(`${this.baseURL}/deleteWebhook?${params.toString()}`, {
+            method: 'POST',
+            headers: this.defaultHeaders
+        });
+
+        const responseData = await response.json();
+        return responseData;
+    }
+
 }

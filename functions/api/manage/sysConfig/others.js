@@ -32,10 +32,11 @@ export async function onRequest(context) {
         // 如果包含 telegramWebhook 配置，单独保存
         if (settings.telegramWebhook) {
             const webhookConfig = {
-                enabled: settings.telegramWebhook.enabled ?? false,
+                enabled: settings.telegramWebhook.enabled ?? true,  // 默认启用
                 botToken: settings.telegramWebhook.botToken || '',
                 chatId: settings.telegramWebhook.chatId || '',
                 webhookSecret: settings.telegramWebhook.webhookSecret || '',
+                webhookUrl: settings.telegramWebhook.webhookUrl || '',  // 添加 webhookUrl 支持
                 lastUpdated: Date.now()
             }
             await db.put('manage@sysConfig@webhookConfig', JSON.stringify(webhookConfig))
@@ -106,6 +107,7 @@ export async function getOthersConfig(db, env) {
         botToken: webhookConfig.botToken || env.TELEGRAM_LISTENER_BOT_TOKEN || '',
         chatId: webhookConfig.chatId || env.TELEGRAM_LISTENER_CHAT_ID || '',
         webhookSecret: webhookConfig.webhookSecret || env.TELEGRAM_WEBHOOK_SECRET || '',
+        webhookUrl: webhookConfig.webhookUrl || '',  // 添加 webhookUrl 字段
         lastUpdated: webhookConfig.lastUpdated || null,
         fixed: false,
     }

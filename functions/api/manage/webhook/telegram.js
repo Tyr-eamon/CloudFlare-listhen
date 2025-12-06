@@ -97,6 +97,7 @@ async function getWebhookStatus(db, env) {
                 botToken: maskToken(config.botToken),
                 chatId: config.chatId,
                 webhookSecret: config.webhookSecret ? '***' : '',
+                webhookUrl: config.webhookUrl || '',  // 返回配置中的 webhookUrl
                 enabled: config.enabled
             },
             webhook: {
@@ -154,8 +155,8 @@ async function enableWebhook(request, db, env) {
             });
         }
 
-        // 确定 Webhook URL
-        const webhookUrl = providedUrl || `${new URL(request.url).origin}/webhook/telegram`;
+        // 确定 Webhook URL：优先使用提供的URL，其次使用配置中的URL，最后使用默认URL
+        const webhookUrl = providedUrl || config.webhookUrl || `${new URL(request.url).origin}/webhook/telegram`;
 
         // 创建 Telegram API 实例
         const telegramAPI = new TelegramAPI(config.botToken);
@@ -177,8 +178,9 @@ async function enableWebhook(request, db, env) {
             });
         }
 
-        // 更新配置，标记为已启用
+        // 更新配置，标记为已启用，并保存使用的 webhookUrl
         config.enabled = true;
+        config.webhookUrl = webhookUrl;  // 保存实际使用的 webhookUrl
         config.lastUpdated = Date.now();
         await db.put('manage@sysConfig@webhookConfig', JSON.stringify(config));
 
@@ -254,6 +256,7 @@ async function registerWebhook(request, db, env) {
             botToken: botToken,
             chatId: chatId || '',
             webhookSecret: webhookSecret || '',
+            webhookUrl: url || '',  // 保存 webhookUrl
             enabled: enabled !== false,
             lastUpdated: Date.now()
         };

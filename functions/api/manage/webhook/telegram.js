@@ -26,8 +26,11 @@ export async function onRequest(context) {
             return await getWebhookStatus(db, env);
         }
 
-        // POST - 注册/更新 Webhook
+        // POST - 注册/更新 Webhook 或启用 Webhook
         if (request.method === 'POST') {
+            if (action === 'enable') {
+                return await enableWebhook(request, db, env);
+            }
             return await registerWebhook(request, db, env);
         }
 
@@ -118,6 +121,84 @@ async function getWebhookStatus(db, env) {
             configured: false
         }), {
             status: 200,
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
+}
+
+async function enableWebhook(request, db, env) {
+    try {
+        const body = await request.json();
+        const { url: providedUrl } = body;
+
+        // 从 KV 读取现有配置
+        const config = await getWebhookConfig(db, env);
+
+        if (!config.botToken) {
+            return new Response(JSON.stringify({
+                success: false,
+                error: 'Bot token not configured. Please configure it first in "Other Settings".'
+            }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+
+        if (!config.chatId) {
+            return new Response(JSON.stringify({
+                success: false,
+                error: 'Chat ID not configured. Please configure it first in "Other Settings".'
+            }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+
+        // 确定 Webhook URL
+        const webhookUrl = providedUrl || `${new URL(request.url).origin}/webhook/telegram`;
+
+        // 创建 Telegram API 实例
+        const telegramAPI = new TelegramAPI(config.botToken);
+
+        // 设置 webhook
+        const result = await telegramAPI.setWebhook(webhookUrl, {
+            secret_token: config.webhookSecret || undefined,
+            allowed_updates: ['channel_post'],
+            drop_pending_updates: false  // 保留待处理的更新
+        });
+
+        if (!result.ok) {
+            return new Response(JSON.stringify({
+                success: false,
+                error: result.description || 'Failed to set webhook'
+            }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+
+        // 更新配置，标记为已启用
+        config.enabled = true;
+        config.lastUpdated = Date.now();
+        await db.put('manage@sysConfig@webhookConfig', JSON.stringify(config));
+
+        return new Response(JSON.stringify({
+            success: true,
+            message: 'Webhook enabled successfully',
+            webhookUrl: webhookUrl,
+            result: result.description || 'Webhook was set'
+        }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+    } catch (error) {
+        console.error('Enable webhook error:', error);
+        return new Response(JSON.stringify({
+            success: false,
+            error: error.message
+        }), {
+            status: 500,
             headers: { 'Content-Type': 'application/json' }
         });
     }

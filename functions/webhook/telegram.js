@@ -19,7 +19,7 @@
  * - animation: Generates filename animation_YYYYMMDD_HHMMSS.gif
  */
 
-import { createResponse } from "../utils/uploadTools";
+import { createResponse } from "../upload/uploadTools";
 import { getDatabase } from '../utils/databaseAdapter.js';
 import { addFileToIndex } from "../utils/indexManager.js";
 

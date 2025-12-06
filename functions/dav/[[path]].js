@@ -205,30 +205,36 @@ async function handlePropfind(request, env) {
 // --- API DATA FETCHING ---
 
 async function fetchDirectoryContents(dir, env, request) {
-    let allFiles = [];
-    let allDirectories = [];
-    const count = -1; // Fetch all items
+     let allFiles = [];
+     let allDirectories = [];
+     const count = -1; // Fetch all items
 
-    const listUrl = new URL(`/api/manage/list`, request.url);
-    listUrl.searchParams.set('dir', dir);
-    listUrl.searchParams.set('count', count);
+     const listUrl = new URL(`/api/manage/list`, request.url);
+     listUrl.searchParams.set('dir', dir);
+     listUrl.searchParams.set('count', count);
 
-    const response = await fetch(listUrl.toString(), { headers: await getApiHeaders(env) });
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API fetch error: Status ${response.status} - ${errorText}`);
-    }
-    
-    const result = await response.json();
-    if (result.error) {
-        throw new Error(`API error: ${result.error} - ${result.message}`);
-    }
+     const response = await fetch(listUrl.toString(), { headers: await getApiHeaders(env) });
+     if (!response.ok) {
+         const errorText = await response.text();
+         throw new Error(`API fetch error: Status ${response.status} - ${errorText}`);
+     }
 
-    if (result.files && result.files.length > 0) allFiles = allFiles.concat(result.files);
-    if (result.directories && result.directories.length > 0) allDirectories = allDirectories.concat(result.directories);
+     const result = await response.json();
+     if (result.error) {
+         throw new Error(`API error: ${result.error} - ${result.message}`);
+     }
 
+     if (result.files && result.files.length > 0) allFiles = allFiles.concat(result.files);
+     if (result.directories && result.directories.length > 0) allDirectories = allDirectories.concat(result.directories);
 
-    return { files: allFiles, directories: [...new Set(allDirectories)] };
+     // Add webhook_imported directory if we're at root
+     if (dir === '' || dir === '/') {
+         if (!allDirectories.includes('webhook_imported')) {
+             allDirectories.push('webhook_imported');
+         }
+     }
+
+     return { files: allFiles, directories: [...new Set(allDirectories)] };
 }
 
 // --- HTML and XML GENERATION ---

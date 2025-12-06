@@ -103,24 +103,29 @@ export async function onRequest(context) {
 
 // 删除单个文件的核心函数
 async function deleteFile(env, fileId, cdnUrl, url) {
-    try {
-        // 读取图片信息
-        const db = getDatabase(env);
-        const img = await db.getWithMetadata(fileId);
+     try {
+         // 读取图片信息
+         const db = getDatabase(env);
+         const img = await db.getWithMetadata(fileId);
 
-        // 如果是R2渠道的图片，需要删除R2中对应的图片
-        if (img.metadata?.Channel === 'CloudflareR2') {
-            const R2DataBase = env.img_r2;
-            await R2DataBase.delete(fileId);
-        }
+         // 如果是R2渠道的图片，需要删除R2中对应的图片
+         if (img.metadata?.Channel === 'CloudflareR2') {
+             const R2DataBase = env.img_r2;
+             await R2DataBase.delete(fileId);
+         }
 
-        // S3 渠道的图片，需要删除S3中对应的图片
-        if (img.metadata?.Channel === 'S3') {
-            await deleteS3File(img);
-        }
+         // S3 渠道的图片，需要删除S3中对应的图片
+         if (img.metadata?.Channel === 'S3') {
+             await deleteS3File(img);
+         }
 
-        // 删除数据库中的记录
-        await db.delete(fileId);
+         // TelegramNew 渠道（Webhook导入的文件）只删除元数据，不删除 Telegram 上的原文件
+         if (img.metadata?.Channel === 'TelegramNew') {
+             console.log(`Deleting TelegramNew file metadata: ${fileId}`);
+         }
+
+         // 删除数据库中的记录
+         await db.delete(fileId);
 
         // 清除CDN缓存
         await purgeCFCache(env, cdnUrl);

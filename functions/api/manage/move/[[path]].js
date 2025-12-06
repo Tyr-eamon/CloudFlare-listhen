@@ -166,6 +166,11 @@ async function moveFile(env, fileId, newFileId, cdnUrl, url) {
             throw new Error('Unsupported Channel');
         }
 
+        // TelegramNew 渠道（Webhook导入的文件）支持移动，只需更新元数据
+        if (img.metadata?.Channel === 'TelegramNew') {
+            console.log(`Moving TelegramNew file: ${fileId} -> ${newFileId}`);
+        }
+
         // 更新文件夹信息，根目录为空，否则为 aaa/123/ 的格式
         const DirectoryPath = newFileId.split('/').slice(0, -1).join('/') === '' ? '' : newFileId.split('/').slice(0, -1).join('/') + '/';
         img.metadata.Directory = DirectoryPath;

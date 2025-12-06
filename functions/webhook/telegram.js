@@ -150,8 +150,9 @@ export async function onRequest(context) {
             });
         }
 
-        // 生成唯一的文件ID
-        const fileId = `tg_webhook_${chatId}_${messageId}_${fileInfo.file_unique_id}`;
+        // 生成唯一的文件ID，包含 webhook_imported 前缀
+        const uniqueId = `tg_webhook_${chatId}_${messageId}_${fileInfo.file_unique_id}`;
+        const fileId = `webhook_imported/${uniqueId}`;
 
         // 构建元数据
         const metadata = {

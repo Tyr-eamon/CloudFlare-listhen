@@ -118,10 +118,16 @@ export async function onRequest(context) {
         // 索引读取失败，直接从 KV 中获取所有文件记录
         if (!result.success) {
             const dbRecords = await getAllFileRecords(context.env, dir);
-            
+
+            // 为根目录添加 webhook_imported 虚拟目录
+            let directories = dbRecords.directories;
+            if ((dir === '' || dir === '/') && !directories.includes('webhook_imported')) {
+                directories = [...directories, 'webhook_imported'];
+            }
+
             return new Response(JSON.stringify({
                 files: dbRecords.files,
-                directories: dbRecords.directories,
+                directories: directories,
                 totalCount: dbRecords.totalCount,
                 returnedCount: dbRecords.returnedCount,
                 indexLastUpdated: Date.now(),
@@ -132,14 +138,27 @@ export async function onRequest(context) {
         }
 
         // 转换文件格式
-        const compatibleFiles = result.files.map(file => ({
-            name: file.id,
-            metadata: file.metadata
-        }));
+        const compatibleFiles = result.files.map(file => {
+            const metadata = {
+                ...file.metadata,
+                IsWebhookImport: file.metadata?.IsWebhookImport || false,
+                Source: file.metadata?.IsWebhookImport ? 'Webhook' : (file.metadata?.Channel || 'Unknown')
+            };
+            return {
+                name: file.id,
+                metadata: metadata
+            };
+        });
+
+        // 为根目录添加 webhook_imported 虚拟目录
+        let directories = [...result.directories];
+        if ((dir === '' || dir === '/') && !directories.includes('webhook_imported')) {
+            directories.push('webhook_imported');
+        }
 
         return new Response(JSON.stringify({
             files: compatibleFiles,
-            directories: result.directories,
+            directories: directories,
             totalCount: result.totalCount,
             returnedCount: result.returnedCount,
             indexLastUpdated: result.indexLastUpdated,

@@ -1,13 +1,16 @@
 # Webhook Management API Documentation
 
-本文档介绍了 Telegram Webhook 管理和文件重命名相关的 API 端点。
+本文档介绍了 Telegram Webhook 管理、文件重命名以及批量操作等相关的 API 端点。
 
 ## 目录
 
 1. [Webhook 管理 API](#webhook-管理-api)
 2. [Webhook 统计 API](#webhook-统计-api)
-3. [文件重命名 API](#文件重命名-api)
-4. [系统配置 API](#系统配置-api)
+3. [Webhook 文件列表 API](#webhook-文件列表-api)
+4. [文件重命名 API](#文件重命名-api)
+5. [批量文件操作 API](#批量文件操作-api)
+6. [目录统计 API](#目录统计-api)
+7. [系统配置 API](#系统配置-api)
 
 ---
 
@@ -224,6 +227,300 @@ curl -X GET "https://your-domain.com/api/manage/rename/webhook_imported,photo_20
 {
   "success": false,
   "error": "New filename is required"
+}
+```
+
+---
+
+## Webhook 文件列表 API
+
+### 端点: `/api/manage/webhook/list`
+
+获取 Webhook 导入的文件列表，支持过滤和排序。
+
+**请求方法:** `GET`
+
+**查询参数:**
+- `start`: 起始位置（默认 0）
+- `count`: 返回数量，-1 表示全部（默认 50）
+- `sort`: 排序方式 - `recent` (默认，按导入时间降序) | `size` (按大小降序) | `name` (按文件名升序)
+- `search`: 搜索关键字（匹配文件名）
+- `mimeType`: 按 MIME 类型过滤 - `image` | `video` | `audio` | `document`
+
+**请求示例:**
+```bash
+curl -X GET "https://your-domain.com/api/manage/webhook/list?start=0&count=20&sort=recent" \
+  -H "Authorization: Basic [credentials]"
+```
+
+**响应示例:**
+```json
+{
+  "success": true,
+  "files": [
+    {
+      "id": "webhook_imported/tg_webhook_-123456789_1_abcd1234",
+      "name": "webhook_imported/tg_webhook_-123456789_1_abcd1234",
+      "fileName": "photo_20240101_120530.jpg",
+      "fileSize": 2.5,
+      "fileSizeFormatted": "2.50 MB",
+      "timeStamp": 1704110730000,
+      "importTime": "2024-01-01T12:05:30.000Z",
+      "mimeType": "image/jpeg",
+      "originalFileName": "",
+      "messageId": "1",
+      "directory": "webhook_imported/",
+      "isWebhookImport": true,
+      "source": "Webhook",
+      "tags": []
+    }
+  ],
+  "totalCount": 100,
+  "returnedCount": 20,
+  "pagination": {
+    "start": 0,
+    "count": 20,
+    "total": 100
+  },
+  "sort": "recent",
+  "indexLastUpdated": 1704110800000
+}
+```
+
+---
+
+## 批量文件操作 API
+
+### 端点: `/api/manage/batch`
+
+支持批量删除、移动或重命名文件。
+
+#### 1. 批量删除文件 (DELETE)
+
+**请求方法:** `DELETE` 或 `POST`（带 `action: "delete"`）
+
+**请求体:**
+```json
+{
+  "fileIds": [
+    "webhook_imported/file1",
+    "webhook_imported/file2"
+  ],
+  "action": "delete"
+}
+```
+
+**请求示例:**
+```bash
+curl -X DELETE https://your-domain.com/api/manage/batch \
+  -H "Authorization: Basic [credentials]" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fileIds": ["webhook_imported/file1", "webhook_imported/file2"],
+    "action": "delete"
+  }'
+```
+
+**响应示例:**
+```json
+{
+  "success": true,
+  "total": 2,
+  "deleted": 2,
+  "errors": []
+}
+```
+
+#### 2. 批量移动文件 (POST)
+
+将多个文件移动到新的目录。
+
+**请求体:**
+```json
+{
+  "fileIds": [
+    "webhook_imported/file1",
+    "webhook_imported/file2"
+  ],
+  "action": "move",
+  "dist": "archived/webhook"
+}
+```
+
+**请求示例:**
+```bash
+curl -X POST https://your-domain.com/api/manage/batch \
+  -H "Authorization: Basic [credentials]" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fileIds": ["webhook_imported/file1", "webhook_imported/file2"],
+    "action": "move",
+    "dist": "archived/webhook"
+  }'
+```
+
+**响应示例:**
+```json
+{
+  "success": true,
+  "total": 2,
+  "moved": 2,
+  "errors": [],
+  "movedFiles": [
+    {
+      "from": "webhook_imported/file1",
+      "to": "archived/webhook/file1"
+    },
+    {
+      "from": "webhook_imported/file2",
+      "to": "archived/webhook/file2"
+    }
+  ]
+}
+```
+
+#### 3. 批量重命名文件 (POST)
+
+支持添加前缀、后缀或进行文本替换。
+
+**请求体:**
+```json
+{
+  "fileIds": [
+    "webhook_imported/file1",
+    "webhook_imported/file2"
+  ],
+  "action": "rename",
+  "prefix": "backup_",
+  "suffix": "",
+  "replacePattern": "",
+  "replaceWith": ""
+}
+```
+
+**请求示例（添加前缀）:**
+```bash
+curl -X POST https://your-domain.com/api/manage/batch \
+  -H "Authorization: Basic [credentials]" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fileIds": ["webhook_imported/file1.jpg", "webhook_imported/file2.jpg"],
+    "action": "rename",
+    "prefix": "archive_"
+  }'
+```
+
+**请求示例（进行文本替换）:**
+```bash
+curl -X POST https://your-domain.com/api/manage/batch \
+  -H "Authorization: Basic [credentials]" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fileIds": ["webhook_imported/photo_20240101.jpg"],
+    "action": "rename",
+    "replacePattern": "photo_",
+    "replaceWith": "image_"
+  }'
+```
+
+**响应示例:**
+```json
+{
+  "success": true,
+  "total": 2,
+  "renamed": 2,
+  "errors": [],
+  "renamedFiles": [
+    {
+      "from": "webhook_imported/file1.jpg",
+      "to": "webhook_imported/archive_file1.jpg",
+      "newFileName": "archive_file1.jpg"
+    }
+  ]
+}
+```
+
+---
+
+## 目录统计 API
+
+### 端点: `/api/manage/statistics/[[path]]`
+
+获取指定目录的文件统计信息。
+
+**请求方法:** `GET`
+
+**路径参数:**
+- `path`: 目录路径（如 `webhook_imported`）
+
+**查询参数:**
+- `byType`: 是否按文件类型统计（默认 false）
+- `bySize`: 是否按大小范围统计（默认 false）
+
+**请求示例:**
+```bash
+curl -X GET "https://your-domain.com/api/manage/statistics/webhook_imported?byType=true&bySize=true" \
+  -H "Authorization: Basic [credentials]"
+```
+
+**响应示例:**
+```json
+{
+  "success": true,
+  "directory": "webhook_imported/",
+  "stats": {
+    "totalFiles": 156,
+    "totalSizeMB": 1024.50,
+    "totalSizeFormatted": "1.00 GB",
+    "oldestFile": {
+      "id": "webhook_imported/file1",
+      "fileName": "photo_20231201.jpg",
+      "timeStamp": 1701388800000,
+      "timeFormatted": "2023-12-01T00:00:00.000Z"
+    },
+    "newestFile": {
+      "id": "webhook_imported/file2",
+      "fileName": "photo_20240101.jpg",
+      "timeStamp": 1704067200000,
+      "timeFormatted": "2024-01-01T00:00:00.000Z"
+    },
+    "filesByType": {
+      "image": {
+        "count": 120,
+        "size": 800.0,
+        "sizeFormatted": "800.00 MB"
+      },
+      "video": {
+        "count": 30,
+        "size": 200.0,
+        "sizeFormatted": "200.00 MB"
+      },
+      "audio": {
+        "count": 6,
+        "size": 24.5,
+        "sizeFormatted": "24.50 MB"
+      }
+    },
+    "fileBySizeRange": {
+      "small": {
+        "count": 50,
+        "label": "< 1 MB"
+      },
+      "medium": {
+        "count": 80,
+        "label": "1-10 MB"
+      },
+      "large": {
+        "count": 20,
+        "label": "10-100 MB"
+      },
+      "veryLarge": {
+        "count": 6,
+        "label": "> 100 MB"
+      }
+    }
+  },
+  "indexLastUpdated": 1704110800000
 }
 ```
 
@@ -507,9 +804,16 @@ curl -X GET "https://your-domain.com/api/manage/rename/[fileId]?newName=new_name
 
 ## 版本信息
 
-- **API 版本**: 1.0.0
-- **最后更新**: 2024-12-05
+- **API 版本**: 1.1.0
+- **最后更新**: 2024-12-06
 - **兼容性**: Cloudflare Pages Functions
+
+### 1.1.0 版本新增功能
+- Webhook 文件列表 API（排序、过滤、搜索）
+- 批量文件操作 API（删除、移动、重命名）
+- 目录统计 API（按类型、大小统计）
+- WebDAV 自动包含 webhook_imported 目录
+- 改进的 Webhook 统计信息
 
 ---
 
